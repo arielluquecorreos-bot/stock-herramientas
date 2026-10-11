@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stock de herramientas</title><meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--tx:#1d1d1b;--mu:#6b6a64;--ac:#f0b429;--bd:#e3e1d8;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--card:#222226;--tx:#f1f0ea;--mu:#9c9a92;--bd:#34343a}}
+:root[data-theme="dark"]{--bg:#17171a;--card:#222226;--tx:#f1f0ea;--mu:#9c9a92;--bd:#34343a}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:90px}
+header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding:12px 14px 8px;z-index:5}
+h1{font-size:20px;margin:0 0 8px}
+input,select,textarea{width:100%;font:inherit;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)}
+.tabs{display:flex;gap:6px;margin-top:8px}
+.tabs button{flex:1;padding:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font:inherit;font-weight:600}
+.tabs button.on{background:var(--ac);color:#1d1d1b;border-color:var(--ac)}
+main{padding:6px 14px;max-width:640px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:8px 0;display:flex;gap:10px;align-items:center}
+.card .nm{flex:1;min-width:0}
+.card b{display:block;overflow-wrap:anywhere}
+.card small{color:var(--mu)}
+.loc{background:var(--ac);color:#1d1d1b;font-weight:700;border-radius:8px;padding:4px 9px;display:inline-block;margin-top:4px}
+.q{display:flex;align-items:center;gap:6px}
+.q button{width:36px;height:36px;border-radius:50%;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:20px}
+.q span{min-width:28px;text-align:center;font-weight:700;font-size:18px}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:50%;border:0;background:var(--ac);color:#1d1d1b;font-size:30px;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+dialog{border:0;border-radius:14px;padding:16px;width:min(92vw,420px);background:var(--card);color:var(--tx)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
+.row{display:flex;gap:8px;margin-top:14px}
+.btn{flex:1;padding:12px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit;font-weight:600}
+.btn.p{background:var(--ac);color:#1d1d1b;border-color:var(--ac)}
+.btn.d{color:var(--bad)}
+.empty{text-align:center;color:var(--mu);padding:30px 10px}
+h2{font-size:16px;margin:18px 0 4px;display:flex;justify-content:space-between;align-items:center}
+.li{padding:6px 0;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;gap:8px}
+</style></head>
+<body>
+<header>
+<h1>🔧 Stock de herramientas</h1><small id="st" style="color:var(--mu);display:block;margin:-4px 0 6px"></small>
+<input id="s" type="search" placeholder="Buscar: amoladora, conector 22…" autocomplete="off">
+<div class="tabs"><button id="t1" class="on">Buscar</button><button id="t2">Cajas</button></div>
+</header>
+<main id="m"></main>
+<button class="fab" id="add" aria-label="Agregar">+</button>
+
+<dialog id="di"><div id="df"></div></dialog>
+
+<script>
+const URL_SCRIPT=https://script.google.com/macros/s/AKfycbw0cBZ57ox68e0HlarfuG64lHylmgy_h40skUdbPamYXc59wsvvEpIBwc99RzjUOU3m/exec;
+const KEY='stock-v1';let S,tab=1,q='',timer;
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.items||!S.locs){S={locs:[1,2,3,4,5,6].map(n=>({id:'c'+n,name:'Caja '+n})).concat([{id:'bolso',name:'Bolso de herramientas'}]),items:[]}}}
+const ON=()=>URL_SCRIPT.startsWith('http');
+function setSt(t){const e=document.getElementById('st');if(e)e.textContent=t}
+const toR=()=>({locs:S.locs.map(l=>l.name),items:S.items.map(i=>({id:i.id,name:i.name,qty:i.qty,loc:locName(i.loc),note:i.note||''}))});
+function fromR(r){const locs=r.locs.map(n=>({id:n,name:n}));const ids=new Set(locs.map(l=>l.id));
+ r.items.forEach(i=>{if(i.loc&&!ids.has(i.loc)){ids.add(i.loc);locs.push({id:i.loc,name:i.loc})}});
+ return {locs,items:r.items.map(i=>({id:i.id,name:i.name,qty:i.qty,loc:i.loc||(locs[0]&&locs[0].id)||'',note:i.note||''}))}}
+function cache(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function dirty(v){try{v?localStorage.setItem(KEY+'-d','1'):localStorage.removeItem(KEY+'-d')}catch(e){}}
+function save(){cache();if(ON()){dirty(1);setSt('Guardando…');clearTimeout(timer);timer=setTimeout(push,800)}}
+async function push(){
+ setSt('Guardando…');
+ try{const r=await fetch(URL_SCRIPT,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(toR())});
+  const j=await r.json();if(j.ok){dirty(0);setSt('✅ Guardado en Google Sheets')}else setSt('⚠️ Error al guardar')}
+ catch(e){setSt('⚠️ Sin conexión: se guardará en el próximo cambio')}
+}
+async function pull(){
+ if(!ON()){setSt('⚠️ Sin conectar a Google Sheets (falta la URL)');return}
+ let d=false;try{d=!!localStorage.getItem(KEY+'-d')}catch(e){}
+ if(d){await push();return}
+ setSt('Sincronizando…');
+ try{const r=await(await fetch(URL_SCRIPT)).json();
+  if(r.locs.length||r.items.length){S=fromR(r);cache();render();setSt('✅ Sincronizado')}else await push()}
+ catch(e){setSt('⚠️ Sin conexión (mostrando datos del celu)')}
+}
+const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const locName=id=>(S.locs.find(l=>l.id===id)||{name:'¿?'}).name;
+const $=id=>document.getElementById(id);
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+function render(){
+ $('t1').className=tab==1?'on':'';$('t2').className=tab==2?'on':'';
+ $('s').style.display=tab==1?'':'none';
+ const m=$('m');
+ if(tab==1){
+  const toks=norm(q).split(/\s+/).filter(Boolean);
+  let list=S.items.filter(i=>{const h=norm(i.name+' '+(i.note||''));return toks.every(t=>h.includes(t))});
+  list.sort((a,b)=>a.name.localeCompare(b.name));
+  if(!S.items.length){m.innerHTML='<div class="empty">Todavía no cargaste nada.<br>Tocá el <b>+</b> para agregar tu primer ítem.</div>';return}
+  if(!list.length){m.innerHTML='<div class="empty">No encontré "'+esc(q)+'".<br>Tocá el + para agregarlo.</div>';return}
+  m.innerHTML=list.map(i=>`<div class="card"><div class="nm" data-e="${i.id}"><b>${esc(i.name)}</b><span class="loc">📦 ${esc(locName(i.loc))}</span>${i.note?`<br><small>${esc(i.note)}</small>`:''}</div><div class="q"><button data-m="${i.id}">−</button><span>${i.qty}</span><button data-p="${i.id}">+</button></div></div>`).join('');
+ }else{
+  let h='';
+  S.locs.forEach(l=>{
+   const its=S.items.filter(i=>i.loc===l.id).sort((a,b)=>a.name.localeCompare(b.name));
+   h+=`<h2>📦 ${esc(l.name)} <button class="btn" style="flex:none;padding:6px 10px" data-l="${l.id}">Editar</button></h2>`;
+   h+=its.length?its.map(i=>`<div class="li" data-e="${i.id}"><span>${esc(i.name)}</span><b>${i.qty}</b></div>`).join(''):'<small style="color:var(--mu)">Vacía</small>';
+  });
+  h+=`<div class="row"><button class="btn" id="nl">+ Nueva caja</button></div>
+  <h2>Respaldo</h2><small style="color:var(--mu)">Tus datos se guardan solo en este navegador del celu. Copiá el respaldo y guardalo (ej. mandártelo por WhatsApp).</small>
+  <textarea id="bk" rows="4" placeholder="Acá aparece el respaldo / pegá uno para restaurar"></textarea>
+  <div class="row"><button class="btn" id="bx">Generar respaldo</button><button class="btn" id="bi">Restaurar</button></div>`;
+  m.innerHTML=h;
+ }
+}
+
+function itemForm(id){
+ const it=id?S.items.find(i=>i.id===id):{name:q,qty:1,loc:S.locs[0].id,note:''};
+ $('df').innerHTML=`<h3 style="margin:0">${id?'Editar':'Nuevo'} ítem</h3>
+ <label>Nombre</label><input id="fn" value="${esc(it.name)}" placeholder="Ej: Conector 22 mm">
+ <label>Cantidad</label><input id="fq" type="number" inputmode="numeric" min="0" value="${it.qty}">
+ <label>Dónde está</label><select id="fl">${S.locs.map(l=>`<option value="${l.id}" ${l.id==it.loc?'selected':''}>${esc(l.name)}</option>`).join('')}</select>
+ <label>Nota (opcional)</label><input id="fo" value="${esc(it.note||'')}" placeholder="Marca, medida, etc.">
+ <div class="row"><button class="btn" id="fc">Cancelar</button>${id?'<button class="btn d" id="fd">Borrar</button>':''}<button class="btn p" id="fs">Guardar</button></div>`;
+ $('di').showModal();
+ $('fc').onclick=()=>$('di').close();
+ if(id)$('fd').onclick=()=>{S.items=S.items.filter(i=>i.id!==id);save();$('di').close();render()};
+ $('fs').onclick=()=>{
+  const n=$('fn').value.trim();if(!n){$('fn').focus();return}
+  const o={name:n,qty:Math.max(0,parseInt($('fq').value)||0),loc:$('fl').value,note:$('fo').value.trim()};
+  if(id)Object.assign(it,o);else S.items.push({id:uid(),...o});
+  save();$('di').close();render();
+ };
+}
+function locForm(id){
+ const l=id?S.locs.find(x=>x.id===id):{name:''};
+ $('df').innerHTML=`<h3 style="margin:0">${id?'Editar':'Nueva'} caja</h3><label>Nombre</label><input id="ln" value="${esc(l.name)}" placeholder="Ej: Caja 7">
+ <div class="row"><button class="btn" id="fc">Cancelar</button>${id?'<button class="btn d" id="ld">Borrar</button>':''}<button class="btn p" id="ls">Guardar</button></div>`;
+ $('di').showModal();
+ $('fc').onclick=()=>$('di').close();
+ if(id)$('ld').onclick=()=>{
+  if(S.items.some(i=>i.loc===id)){$('ld').textContent='Tiene ítems: movelos antes';return}
+  S.locs=S.locs.filter(x=>x.id!==id);save();$('di').close();render()};
+ $('ls').onclick=()=>{const n=$('ln').value.trim();if(!n)return;
+  if(id)l.name=n;else S.locs.push({id:uid(),name:n});save();$('di').close();render()};
+}
+
+document.addEventListener('click',e=>{
+ const t=e.target.closest('[data-m],[data-p],[data-e],[data-l]');
+ if(t){
+  const d=t.dataset;
+  if(d.m||d.p){const it=S.items.find(i=>i.id==(d.m||d.p));it.qty=Math.max(0,it.qty+(d.p?1:-1));save();render();return}
+  if(d.e){itemForm(d.e);return}
+  if(d.l){locForm(d.l);return}
+ }
+ if(e.target.id=='nl')locForm();
+ if(e.target.id=='bx'){const v=JSON.stringify(S);$('bk').value=v;$('bk').select();try{navigator.clipboard.writeText(v)}catch(x){}}
+ if(e.target.id=='bi'){try{const o=JSON.parse($('bk').value);if(o.items&&o.locs){S=o;save();render();$('bi').textContent='¡Restaurado!'}else throw 0}catch(x){$('bi').textContent='Respaldo inválido'}}
+});
+$('s').oninput=e=>{q=e.target.value;render()};
+$('t1').onclick=()=>{tab=1;render()};
+$('t2').onclick=()=>{tab=2;render()};
+$('add').onclick=()=>itemForm();
+load();render();pull();
+</script>
+</body></html>
