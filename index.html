@@ -48,7 +48,7 @@ h2{font-size:16px;margin:18px 0 4px;display:flex;justify-content:space-between;a
 <dialog id="di"><div id="df"></div></dialog>
 
 <script>
-const URL_SCRIPT=https://script.google.com/macros/s/AKfycbw0cBZ57ox68e0HlarfuG64lHylmgy_h40skUdbPamYXc59wsvvEpIBwc99RzjUOU3m/exec;
+const URL_SCRIPT='https://script.google.com/macros/s/AKfycbw0cBZ57ox68e0HlarfuG64lHylmgy_h40skUdbPamYXc59wsvvEpIBwc99RzjUOU3m/exec';
 const KEY='stock-v1';let S,tab=1,q='',timer;
 function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.items||!S.locs){S={locs:[1,2,3,4,5,6].map(n=>({id:'c'+n,name:'Caja '+n})).concat([{id:'bolso',name:'Bolso de herramientas'}]),items:[]}}}
