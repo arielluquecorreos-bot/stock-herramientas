@@ -97,11 +97,11 @@ function render(){
   let h='';
   S.locs.forEach(l=>{
    const its=S.items.filter(i=>i.loc===l.id).sort((a,b)=>a.name.localeCompare(b.name));
-   h+=`<h2>📦 ${esc(l.name)} <button class="btn" style="flex:none;padding:6px 10px" data-l="${l.id}">Editar</button></h2>`;
+   h+=`<h2>📦 ${esc(l.name)} <span style="display:flex;gap:6px"><button class="btn" style="flex:none;padding:6px 10px" data-b="${l.id}">🖨 Etiqueta</button><button class="btn" style="flex:none;padding:6px 10px" data-l="${l.id}">Editar</button></span></h2>`;
    h+=its.length?its.map(i=>`<div class="li" data-e="${i.id}"><span>${esc(i.name)}</span><b>${i.qty}</b></div>`).join(''):'<small style="color:var(--mu)">Vacía</small>';
   });
   h+=`<div class="row"><button class="btn" id="nl">+ Nueva caja</button></div>
-  <h2>Respaldo</h2><small style="color:var(--mu)">Tus datos se guardan solo en este navegador del celu. Copiá el respaldo y guardalo (ej. mandártelo por WhatsApp).</small>
+  <h2>Respaldo</h2><small style="color:var(--mu)">Tus datos ya se guardan en tu planilla de Google. El respaldo es una copia extra, por las dudas.</small>
   <textarea id="bk" rows="4" placeholder="Acá aparece el respaldo / pegá uno para restaurar"></textarea>
   <div class="row"><button class="btn" id="bx">Generar respaldo</button><button class="btn" id="bi">Restaurar</button></div>`;
   m.innerHTML=h;
@@ -139,13 +139,58 @@ function locForm(id){
   if(id)l.name=n;else S.locs.push({id:uid(),name:n});save();$('di').close();render()};
 }
 
+function labelForm(id){
+ let c={w:38,h:18,q:1};try{Object.assign(c,JSON.parse(localStorage.getItem(KEY+'-lbl')))}catch(e){}
+ const l=S.locs.find(x=>x.id===id);
+ $('df').innerHTML=`<h3 style="margin:0">Etiqueta: ${esc(l.name)}</h3>
+ <label>Ancho (cm)</label><input id="lw" type="number" step="0.5" value="${c.w}">
+ <label>Alto (cm)</label><input id="lh" type="number" step="0.5" value="${c.h}">
+ <label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input id="lq" type="checkbox" style="width:auto" ${c.q?'checked':''}> Mostrar cantidades</label>
+ <small style="color:var(--mu)">Se descarga un archivo de Word en mayúsculas y color negro. El color y la letra los cambiás desde Word.</small>
+ <div class="row"><button class="btn" id="fc">Cancelar</button><button class="btn p" id="lg">Descargar Word</button></div>`;
+ $('di').showModal();
+ $('fc').onclick=()=>$('di').close();
+ $('lg').onclick=()=>{
+  const w=parseFloat($('lw').value)||38,h=parseFloat($('lh').value)||18,q=$('lq').checked;
+  try{localStorage.setItem(KEY+'-lbl',JSON.stringify({w:w,h:h,q:q?1:0}))}catch(e){}
+  makeLabel(l,w,h,q);$('di').close();
+ };
+}
+function makeLabel(l,w,h,q){
+ const U=t=>esc(String(t).toUpperCase());
+ const its=S.items.filter(i=>i.loc===l.id).sort((a,b)=>a.name.localeCompare(b.name));
+ const lines=its.map(i=>U(i.name)+(q?' ('+i.qty+')':''));
+ if(!lines.length)lines.push('(VACÍA)');
+ const n=lines.length,cols=n<=6?1:n<=14?2:3,rows=Math.ceil(n/cols);
+ const tfs=h<12?48:72;
+ const availH=(h-1.6-(tfs/28.35)-1.2)*28.35;
+ const colW=((w-1.6-1)/cols)*28.35;
+ const maxLen=Math.max(...lines.map(t=>t.length));
+ let fs=Math.min(availH/(rows*1.45),colW/(maxLen*0.72),44);
+ fs=Math.max(14,Math.round(fs));
+ const td=Array.from({length:cols},(_,k)=>'<td valign="top" style="width:'+(100/cols)+'%;padding:6pt 10pt">'+
+  lines.slice(k*rows,(k+1)*rows).map(t=>'<p style="margin:0 0 '+Math.round(fs*0.3)+'pt 0;font-size:'+fs+'pt;font-family:Arial">'+t+'</p>').join('')+'</td>').join('');
+ const doc='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Etiqueta</title>'+
+  '<!-'+'-[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-'+'->'+
+  '<style>@page Section1{size:'+w+'cm '+h+'cm;mso-page-orientation:'+(w>=h?'landscape':'portrait')+';margin:0.8cm 0.8cm 0.8cm 0.8cm}div.Section1{page:Section1}body{font-family:Arial}</style></head><body><div class="Section1">'+
+  '<p style="text-align:center;margin:0 0 12pt 0;font-size:'+tfs+'pt;font-weight:bold;font-family:Arial">'+U(l.name)+'</p>'+
+  '<table width="100%" border="1" cellspacing="0" cellpadding="0" style="border:2.25pt solid #000000;border-collapse:collapse"><tr>'+td+'</tr></table></div></body></html>';
+ const b=new Blob(['\ufeff',doc],{type:'application/msword'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(b);
+ a.download=('ETIQUETA '+l.name.toUpperCase()).replace(/[\\\/:*?"<>|]/g,'')+'.doc';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
 document.addEventListener('click',e=>{
- const t=e.target.closest('[data-m],[data-p],[data-e],[data-l]');
+ const t=e.target.closest('[data-m],[data-p],[data-e],[data-l],[data-b]');
  if(t){
   const d=t.dataset;
   if(d.m||d.p){const it=S.items.find(i=>i.id==(d.m||d.p));it.qty=Math.max(0,it.qty+(d.p?1:-1));save();render();return}
   if(d.e){itemForm(d.e);return}
   if(d.l){locForm(d.l);return}
+  if(d.b){labelForm(d.b);return}
  }
  if(e.target.id=='nl')locForm();
  if(e.target.id=='bx'){const v=JSON.stringify(S);$('bk').value=v;$('bk').select();try{navigator.clipboard.writeText(v)}catch(x){}}
